@@ -35,6 +35,9 @@ func (c *Conn) clientHandshake() error {
 	possibleCipherSuites := c.config.cipherSuites()
 	hello.cipherSuites = make([]uint16, 0, len(possibleCipherSuites))
 
+    // if pskCiphers is true we don't use certificates
+    pskCiphers := true
+
 NextCipherSuite:
 	for _, suiteId := range possibleCipherSuites {
 		for _, suite := range cipherSuites {
@@ -46,6 +49,10 @@ NextCipherSuite:
 			if hello.vers < VersionTLS12 && suite.flags&suiteTLS12 != 0 {
 				continue
 			}
+            // pskCiphers should be true only if all ciphers are PSK related
+            if suite.flags&suitePSK == 0 {
+                pskCiphers = false
+            }
 			hello.cipherSuites = append(hello.cipherSuites, suiteId)
 			continue NextCipherSuite
 		}
@@ -107,167 +114,174 @@ NextCipherSuite:
 	if err != nil {
 		return err
 	}
-	certMsg, ok := msg.(*certificateMsg)
-	if !ok || len(certMsg.certificates) == 0 {
-		return c.sendAlert(alertUnexpectedMessage)
-	}
-	finishedHash.Write(certMsg.marshal())
 
-	certs := make([]*x509.Certificate, len(certMsg.certificates))
-	for i, asn1Data := range certMsg.certificates {
-		cert, err := x509.ParseCertificate(asn1Data)
-		if err != nil {
-			c.sendAlert(alertBadCertificate)
-			return errors.New("failed to parse certificate from server: " + err.Error())
-		}
-		certs[i] = cert
-	}
+    var certRequested bool
+    var chainToSend *Certificate
+    var certs []*x509.Certificate
 
-	if !c.config.InsecureSkipVerify {
-		opts := x509.VerifyOptions{
-			Roots:         c.config.RootCAs,
-			CurrentTime:   c.config.time(),
-			DNSName:       c.config.ServerName,
-			Intermediates: x509.NewCertPool(),
-		}
+    if !pskCiphers {
+        certMsg, ok := msg.(*certificateMsg)
+        if !ok || len(certMsg.certificates) == 0 {
+            return c.sendAlert(alertUnexpectedMessage)
+        }
+        finishedHash.Write(certMsg.marshal())
 
-		for i, cert := range certs {
-			if i == 0 {
-				continue
-			}
-			opts.Intermediates.AddCert(cert)
-		}
-		c.verifiedChains, err = certs[0].Verify(opts)
-		if err != nil {
-			c.sendAlert(alertBadCertificate)
-			return err
-		}
-	}
+        certs = make([]*x509.Certificate, len(certMsg.certificates))
+        for i, asn1Data := range certMsg.certificates {
+            cert, err := x509.ParseCertificate(asn1Data)
+            if err != nil {
+                c.sendAlert(alertBadCertificate)
+                return errors.New("failed to parse certificate from server: " + err.Error())
+            }
+            certs[i] = cert
+        }
 
-	switch certs[0].PublicKey.(type) {
-	case *rsa.PublicKey, *ecdsa.PublicKey:
-		break
-	default:
-		return c.sendAlert(alertUnsupportedCertificate)
-	}
+        if !c.config.InsecureSkipVerify {
+            opts := x509.VerifyOptions{
+                Roots:         c.config.RootCAs,
+                CurrentTime:   c.config.time(),
+                DNSName:       c.config.ServerName,
+                Intermediates: x509.NewCertPool(),
+            }
 
-	c.peerCertificates = certs
+            for i, cert := range certs {
+                if i == 0 {
+                    continue
+                }
+                opts.Intermediates.AddCert(cert)
+            }
+            c.verifiedChains, err = certs[0].Verify(opts)
+            if err != nil {
+                c.sendAlert(alertBadCertificate)
+                return err
+            }
+        }
 
-	if serverHello.ocspStapling {
-		msg, err = c.readHandshake()
-		if err != nil {
-			return err
-		}
-		cs, ok := msg.(*certificateStatusMsg)
-		if !ok {
-			return c.sendAlert(alertUnexpectedMessage)
-		}
-		finishedHash.Write(cs.marshal())
+        switch certs[0].PublicKey.(type) {
+        case *rsa.PublicKey, *ecdsa.PublicKey:
+            break
+        default:
+            return c.sendAlert(alertUnsupportedCertificate)
+        }
 
-		if cs.statusType == statusTypeOCSP {
-			c.ocspResponse = cs.response
-		}
-	}
+        c.peerCertificates = certs
 
-	msg, err = c.readHandshake()
-	if err != nil {
-		return err
-	}
+        if serverHello.ocspStapling {
+            msg, err = c.readHandshake()
+            if err != nil {
+                return err
+            }
+            cs, ok := msg.(*certificateStatusMsg)
+            if !ok {
+                return c.sendAlert(alertUnexpectedMessage)
+            }
+            finishedHash.Write(cs.marshal())
 
-	keyAgreement := suite.ka(c.vers)
+            if cs.statusType == statusTypeOCSP {
+                c.ocspResponse = cs.response
+            }
+        }
+    }
 
-	skx, ok := msg.(*serverKeyExchangeMsg)
-	if ok {
-		finishedHash.Write(skx.marshal())
-		err = keyAgreement.processServerKeyExchange(c.config, hello, serverHello, certs[0], skx)
-		if err != nil {
-			c.sendAlert(alertUnexpectedMessage)
-			return err
-		}
+    msg, err = c.readHandshake()
+    if err != nil {
+        return err
+    }
 
-		msg, err = c.readHandshake()
-		if err != nil {
-			return err
-		}
-	}
+    keyAgreement := suite.ka(c.vers)
 
-	var chainToSend *Certificate
-	var certRequested bool
-	certReq, ok := msg.(*certificateRequestMsg)
-	if ok {
-		certRequested = true
+    skx, ok := msg.(*serverKeyExchangeMsg)
+    if ok {
+        finishedHash.Write(skx.marshal())
+        err = keyAgreement.processServerKeyExchange(c.config, hello, serverHello, certs[0], skx)
+        if err != nil {
+            c.sendAlert(alertUnexpectedMessage)
+            return err
+        }
 
-		// RFC 4346 on the certificateAuthorities field:
-		// A list of the distinguished names of acceptable certificate
-		// authorities. These distinguished names may specify a desired
-		// distinguished name for a root CA or for a subordinate CA;
-		// thus, this message can be used to describe both known roots
-		// and a desired authorization space. If the
-		// certificate_authorities list is empty then the client MAY
-		// send any certificate of the appropriate
-		// ClientCertificateType, unless there is some external
-		// arrangement to the contrary.
+        msg, err = c.readHandshake()
+        if err != nil {
+            return err
+        }
+    }
 
-		finishedHash.Write(certReq.marshal())
+    if !pskCiphers {
+        certReq, ok := msg.(*certificateRequestMsg)
+        if ok {
+            certRequested = true
 
-		var rsaAvail, ecdsaAvail bool
-		for _, certType := range certReq.certificateTypes {
-			switch certType {
-			case certTypeRSASign:
-				rsaAvail = true
-			case certTypeECDSASign:
-				ecdsaAvail = true
-			}
-		}
+            // RFC 4346 on the certificateAuthorities field:
+            // A list of the distinguished names of acceptable certificate
+            // authorities. These distinguished names may specify a desired
+            // distinguished name for a root CA or for a subordinate CA;
+            // thus, this message can be used to describe both known roots
+            // and a desired authorization space. If the
+            // certificate_authorities list is empty then the client MAY
+            // send any certificate of the appropriate
+            // ClientCertificateType, unless there is some external
+            // arrangement to the contrary.
 
-		// We need to search our list of client certs for one
-		// where SignatureAlgorithm is RSA and the Issuer is in
-		// certReq.certificateAuthorities
-	findCert:
-		for i, chain := range c.config.Certificates {
-			if !rsaAvail && !ecdsaAvail {
-				continue
-			}
+            finishedHash.Write(certReq.marshal())
 
-			for j, cert := range chain.Certificate {
-				x509Cert := chain.Leaf
-				// parse the certificate if this isn't the leaf
-				// node, or if chain.Leaf was nil
-				if j != 0 || x509Cert == nil {
-					if x509Cert, err = x509.ParseCertificate(cert); err != nil {
-						c.sendAlert(alertInternalError)
-						return errors.New("tls: failed to parse client certificate #" + strconv.Itoa(i) + ": " + err.Error())
-					}
-				}
+            var rsaAvail, ecdsaAvail bool
+            for _, certType := range certReq.certificateTypes {
+                switch certType {
+                case certTypeRSASign:
+                    rsaAvail = true
+                case certTypeECDSASign:
+                    ecdsaAvail = true
+                }
+            }
 
-				switch {
-				case rsaAvail && x509Cert.PublicKeyAlgorithm == x509.RSA:
-				case ecdsaAvail && x509Cert.PublicKeyAlgorithm == x509.ECDSA:
-				default:
-					continue findCert
-				}
+            // We need to search our list of client certs for one
+            // where SignatureAlgorithm is RSA and the Issuer is in
+            // certReq.certificateAuthorities
+        findCert:
+            for i, chain := range c.config.Certificates {
+                if !rsaAvail && !ecdsaAvail {
+                    continue
+                }
 
-				if len(certReq.certificateAuthorities) == 0 {
-					// they gave us an empty list, so just take the
-					// first RSA cert from c.config.Certificates
-					chainToSend = &chain
-					break findCert
-				}
+                for j, cert := range chain.Certificate {
+                    x509Cert := chain.Leaf
+                    // parse the certificate if this isn't the leaf
+                    // node, or if chain.Leaf was nil
+                    if j != 0 || x509Cert == nil {
+                        if x509Cert, err = x509.ParseCertificate(cert); err != nil {
+                            c.sendAlert(alertInternalError)
+                            return errors.New("tls: failed to parse client certificate #" + strconv.Itoa(i) + ": " + err.Error())
+                        }
+                    }
 
-				for _, ca := range certReq.certificateAuthorities {
-					if bytes.Equal(x509Cert.RawIssuer, ca) {
-						chainToSend = &chain
-						break findCert
-					}
-				}
-			}
-		}
+                    switch {
+                    case rsaAvail && x509Cert.PublicKeyAlgorithm == x509.RSA:
+                    case ecdsaAvail && x509Cert.PublicKeyAlgorithm == x509.ECDSA:
+                    default:
+                        continue findCert
+                    }
 
-		msg, err = c.readHandshake()
-		if err != nil {
-			return err
-		}
-	}
+                    if len(certReq.certificateAuthorities) == 0 {
+                        // they gave us an empty list, so just take the
+                        // first RSA cert from c.config.Certificates
+                        chainToSend = &chain
+                        break findCert
+                    }
+
+                    for _, ca := range certReq.certificateAuthorities {
+                        if bytes.Equal(x509Cert.RawIssuer, ca) {
+                            chainToSend = &chain
+                            break findCert
+                        }
+                    }
+                }
+            }
+
+            msg, err = c.readHandshake()
+            if err != nil {
+                return err
+            }
+        }
+    }
 
 	shd, ok := msg.(*serverHelloDoneMsg)
 	if !ok {
@@ -279,7 +293,7 @@ NextCipherSuite:
 	// Certificate message, even if it's empty because we don't have a
 	// certificate to send.
 	if certRequested {
-		certMsg = new(certificateMsg)
+		certMsg := new(certificateMsg)
 		if chainToSend != nil {
 			certMsg.certificates = chainToSend.Certificate
 		}

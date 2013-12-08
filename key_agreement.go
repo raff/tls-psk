@@ -410,11 +410,11 @@ func (ka pskKeyAgreement) generateServerKeyExchange(config *Config, cert *Certif
 
 func (ka pskKeyAgreement) processClientKeyExchange(config *Config, cert *Certificate, ckx *clientKeyExchangeMsg, version uint16) ([]byte, error) {
 
-        var iconfig interface{} = config
-        pskConfig, ok := iconfig.(PSKConfigProvider)
-        if !ok {
+	var iconfig interface{} = config
+	pskConfig, ok := iconfig.(PSKConfigProvider)
+	if !ok {
 		return nil, errors.New("bad Config")
-        }
+	}
 
 	if len(ckx.ciphertext) < 2 {
 		return nil, errors.New("bad ClientKeyExchange")
@@ -453,19 +453,19 @@ func (ka pskKeyAgreement) processServerKeyExchange(config *Config, clientHello *
 
 func (ka pskKeyAgreement) generateClientKeyExchange(config *Config, clientHello *clientHelloMsg, cert *x509.Certificate) ([]byte, *clientKeyExchangeMsg, error) {
 
-        var iconfig interface{} = config
-        pskConfig, ok := iconfig.(PSKConfigProvider)
-        if !ok {
+	var iconfig interface{} = config
+	pskConfig, ok := iconfig.(PSKConfigProvider)
+	if !ok {
 		return nil, nil, errors.New("bad Config")
-        }
+	}
 
-        pskIdentity := pskConfig.GetIdentity()
+	pskIdentity := pskConfig.GetIdentity()
 	key, err := pskConfig.GetKey(pskIdentity)
 	if err != nil {
 		return nil, nil, err
 	}
 
-        psk := []byte(key)
+	psk := []byte(key)
 	lenpsk := len(psk)
 
 	preMasterSecret := make([]byte, 2*lenpsk+4)
@@ -475,7 +475,7 @@ func (ka pskKeyAgreement) generateClientKeyExchange(config *Config, clientHello 
 	preMasterSecret[lenpsk+3] = preMasterSecret[1]
 	copy(preMasterSecret[lenpsk:], psk)
 
-        bIdentity := []byte(pskIdentity)
+	bIdentity := []byte(pskIdentity)
 	lenpski := len(bIdentity)
 
 	ckx := new(clientKeyExchangeMsg)

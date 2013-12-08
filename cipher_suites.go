@@ -48,9 +48,9 @@ const (
 	// suiteTLS12 indicates that the cipher suite should only be advertised
 	// and accepted when using TLS 1.2.
 	suiteTLS12
-        // suitePSK indicates that the cipher suite involves PSK
-        // (i.e. there are not certificates)
-        suitePSK
+	// suitePSK indicates that the cipher suite involves PSK
+	// (i.e. there are not certificates)
+	suitePSK
 )
 
 // A cipherSuite is a specific combination of key agreement, cipher and MAC

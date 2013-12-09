@@ -410,10 +410,8 @@ func (ka pskKeyAgreement) generateServerKeyExchange(config *Config, cert *Certif
 
 func (ka pskKeyAgreement) processClientKeyExchange(config *Config, cert *Certificate, ckx *clientKeyExchangeMsg, version uint16) ([]byte, error) {
 
-	var iconfig interface{} = config
-	pskConfig, ok := iconfig.(PSKConfigProvider)
-	if !ok {
-		return nil, errors.New("bad Config")
+        if config.GetKey == nil {
+		return nil, errors.New("bad Config - GetKey required for PSK")
 	}
 
 	if len(ckx.ciphertext) < 2 {
@@ -430,7 +428,7 @@ func (ka pskKeyAgreement) processClientKeyExchange(config *Config, cert *Certifi
 	}
 
 	// ciphertext is actually the pskIdentity here
-	psk, err := pskConfig.GetKey(string(ciphertext))
+	psk, err := config.GetKey(string(ciphertext))
 	if err != nil {
 		return nil, err
 	}
@@ -453,14 +451,15 @@ func (ka pskKeyAgreement) processServerKeyExchange(config *Config, clientHello *
 
 func (ka pskKeyAgreement) generateClientKeyExchange(config *Config, clientHello *clientHelloMsg, cert *x509.Certificate) ([]byte, *clientKeyExchangeMsg, error) {
 
-	var iconfig interface{} = config
-	pskConfig, ok := iconfig.(PSKConfigProvider)
-	if !ok {
-		return nil, nil, errors.New("bad Config")
+	if config.GetIdentity == nil {
+		return nil, nil, errors.New("bad Config - GetIdentity required for PSK")
+	}
+        if config.GetKey == nil {
+		return nil, nil, errors.New("bad Config - GetKey required for PSK")
 	}
 
-	pskIdentity := pskConfig.GetIdentity()
-	key, err := pskConfig.GetKey(pskIdentity)
+	pskIdentity := config.GetIdentity()
+	key, err := config.GetKey(pskIdentity)
 	if err != nil {
 		return nil, nil, err
 	}

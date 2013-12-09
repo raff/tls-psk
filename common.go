@@ -254,6 +254,13 @@ type Config struct {
 	// which is currently TLS 1.2.
 	MaxVersion uint16
 
+	// PSK: client-only - returns the client identity
+	GetIdentity func() string
+
+	// PSK: for server - returns the key associated to a client identity
+	//      for client - returns the key for this client
+	GetKey func(identity string) ([]byte, error)
+
 	serverInitOnce sync.Once // guards calling (*Config).serverInit
 }
 

@@ -110,20 +110,23 @@ NextCipherSuite:
 		return c.sendAlert(alertHandshakeFailure)
 	}
 
+	var certRequested bool
+	var chainToSend *Certificate
+	var certs []*x509.Certificate
+
 	msg, err = c.readHandshake()
 	if err != nil {
 		return err
 	}
 
-	var certRequested bool
-	var chainToSend *Certificate
-	var certs []*x509.Certificate
-
-	if !pskCiphers {
-		certMsg, ok := msg.(*certificateMsg)
-		if !ok || len(certMsg.certificates) == 0 {
+	certMsg, ok := msg.(*certificateMsg)
+	if !ok {
+		if !pskCiphers {
 			return c.sendAlert(alertUnexpectedMessage)
 		}
+	} else if len(certMsg.certificates) == 0 {
+		return c.sendAlert(alertUnexpectedMessage)
+	} else {
 		finishedHash.Write(certMsg.marshal())
 
 		certs = make([]*x509.Certificate, len(certMsg.certificates))
@@ -181,11 +184,11 @@ NextCipherSuite:
 				c.ocspResponse = cs.response
 			}
 		}
-	}
 
-	msg, err = c.readHandshake()
-	if err != nil {
-		return err
+		msg, err = c.readHandshake()
+		if err != nil {
+			return err
+		}
 	}
 
 	keyAgreement := suite.ka(c.vers)
@@ -205,81 +208,79 @@ NextCipherSuite:
 		}
 	}
 
-	if !pskCiphers {
-		certReq, ok := msg.(*certificateRequestMsg)
-		if ok {
-			certRequested = true
+	certReq, ok := msg.(*certificateRequestMsg)
+	if ok {
+		certRequested = true
 
-			// RFC 4346 on the certificateAuthorities field:
-			// A list of the distinguished names of acceptable certificate
-			// authorities. These distinguished names may specify a desired
-			// distinguished name for a root CA or for a subordinate CA;
-			// thus, this message can be used to describe both known roots
-			// and a desired authorization space. If the
-			// certificate_authorities list is empty then the client MAY
-			// send any certificate of the appropriate
-			// ClientCertificateType, unless there is some external
-			// arrangement to the contrary.
+		// RFC 4346 on the certificateAuthorities field:
+		// A list of the distinguished names of acceptable certificate
+		// authorities. These distinguished names may specify a desired
+		// distinguished name for a root CA or for a subordinate CA;
+		// thus, this message can be used to describe both known roots
+		// and a desired authorization space. If the
+		// certificate_authorities list is empty then the client MAY
+		// send any certificate of the appropriate
+		// ClientCertificateType, unless there is some external
+		// arrangement to the contrary.
 
-			finishedHash.Write(certReq.marshal())
+		finishedHash.Write(certReq.marshal())
 
-			var rsaAvail, ecdsaAvail bool
-			for _, certType := range certReq.certificateTypes {
-				switch certType {
-				case certTypeRSASign:
-					rsaAvail = true
-				case certTypeECDSASign:
-					ecdsaAvail = true
-				}
+		var rsaAvail, ecdsaAvail bool
+		for _, certType := range certReq.certificateTypes {
+			switch certType {
+			case certTypeRSASign:
+				rsaAvail = true
+			case certTypeECDSASign:
+				ecdsaAvail = true
+			}
+		}
+
+		// We need to search our list of client certs for one
+		// where SignatureAlgorithm is RSA and the Issuer is in
+		// certReq.certificateAuthorities
+	findCert:
+		for i, chain := range c.config.Certificates {
+			if !rsaAvail && !ecdsaAvail {
+				continue
 			}
 
-			// We need to search our list of client certs for one
-			// where SignatureAlgorithm is RSA and the Issuer is in
-			// certReq.certificateAuthorities
-		findCert:
-			for i, chain := range c.config.Certificates {
-				if !rsaAvail && !ecdsaAvail {
-					continue
+			for j, cert := range chain.Certificate {
+				x509Cert := chain.Leaf
+				// parse the certificate if this isn't the leaf
+				// node, or if chain.Leaf was nil
+				if j != 0 || x509Cert == nil {
+					if x509Cert, err = x509.ParseCertificate(cert); err != nil {
+						c.sendAlert(alertInternalError)
+						return errors.New("tls: failed to parse client certificate #" + strconv.Itoa(i) + ": " + err.Error())
+					}
 				}
 
-				for j, cert := range chain.Certificate {
-					x509Cert := chain.Leaf
-					// parse the certificate if this isn't the leaf
-					// node, or if chain.Leaf was nil
-					if j != 0 || x509Cert == nil {
-						if x509Cert, err = x509.ParseCertificate(cert); err != nil {
-							c.sendAlert(alertInternalError)
-							return errors.New("tls: failed to parse client certificate #" + strconv.Itoa(i) + ": " + err.Error())
-						}
-					}
+				switch {
+				case rsaAvail && x509Cert.PublicKeyAlgorithm == x509.RSA:
+				case ecdsaAvail && x509Cert.PublicKeyAlgorithm == x509.ECDSA:
+				default:
+					continue findCert
+				}
 
-					switch {
-					case rsaAvail && x509Cert.PublicKeyAlgorithm == x509.RSA:
-					case ecdsaAvail && x509Cert.PublicKeyAlgorithm == x509.ECDSA:
-					default:
-						continue findCert
-					}
+				if len(certReq.certificateAuthorities) == 0 {
+					// they gave us an empty list, so just take the
+					// first RSA cert from c.config.Certificates
+					chainToSend = &chain
+					break findCert
+				}
 
-					if len(certReq.certificateAuthorities) == 0 {
-						// they gave us an empty list, so just take the
-						// first RSA cert from c.config.Certificates
+				for _, ca := range certReq.certificateAuthorities {
+					if bytes.Equal(x509Cert.RawIssuer, ca) {
 						chainToSend = &chain
 						break findCert
 					}
-
-					for _, ca := range certReq.certificateAuthorities {
-						if bytes.Equal(x509Cert.RawIssuer, ca) {
-							chainToSend = &chain
-							break findCert
-						}
-					}
 				}
 			}
+		}
 
-			msg, err = c.readHandshake()
-			if err != nil {
-				return err
-			}
+		msg, err = c.readHandshake()
+		if err != nil {
+			return err
 		}
 	}
 

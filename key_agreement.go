@@ -440,7 +440,7 @@ func (ka pskKeyAgreement) processClientKeyExchange(config *Config, cert *Certifi
 	preMasterSecret[1] = byte(lenpsk)
 	preMasterSecret[lenpsk+2] = preMasterSecret[0]
 	preMasterSecret[lenpsk+3] = preMasterSecret[1]
-	copy(preMasterSecret[lenpsk:], psk)
+	copy(preMasterSecret[lenpsk+4:], psk)
 
 	return preMasterSecret, nil
 }
@@ -472,7 +472,7 @@ func (ka pskKeyAgreement) generateClientKeyExchange(config *Config, clientHello 
 	preMasterSecret[1] = byte(lenpsk)
 	preMasterSecret[lenpsk+2] = preMasterSecret[0]
 	preMasterSecret[lenpsk+3] = preMasterSecret[1]
-	copy(preMasterSecret[lenpsk:], psk)
+	copy(preMasterSecret[lenpsk+4:], psk)
 
 	bIdentity := []byte(pskIdentity)
 	lenpski := len(bIdentity)

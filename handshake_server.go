@@ -285,17 +285,21 @@ func (hs *serverHandshakeState) doFullHandshake() error {
 	hs.finishedHash.Write(hs.hello.marshal())
 	c.writeRecord(recordTypeHandshake, hs.hello.marshal())
 
-	certMsg := new(certificateMsg)
-	certMsg.certificates = hs.cert.Certificate
-	hs.finishedHash.Write(certMsg.marshal())
-	c.writeRecord(recordTypeHandshake, certMsg.marshal())
+	var certMsg *certificateMsg
 
-	if hs.hello.ocspStapling {
-		certStatus := new(certificateStatusMsg)
-		certStatus.statusType = statusTypeOCSP
-		certStatus.response = hs.cert.OCSPStaple
-		hs.finishedHash.Write(certStatus.marshal())
-		c.writeRecord(recordTypeHandshake, certStatus.marshal())
+	if hs.suite.flags&suitePSK == 0 { // no certificates for PSK
+		certMsg = new(certificateMsg)
+		certMsg.certificates = hs.cert.Certificate
+		hs.finishedHash.Write(certMsg.marshal())
+		c.writeRecord(recordTypeHandshake, certMsg.marshal())
+
+		if hs.hello.ocspStapling {
+			certStatus := new(certificateStatusMsg)
+			certStatus.statusType = statusTypeOCSP
+			certStatus.response = hs.cert.OCSPStaple
+			hs.finishedHash.Write(certStatus.marshal())
+			c.writeRecord(recordTypeHandshake, certStatus.marshal())
+		}
 	}
 
 	keyAgreement := hs.suite.ka(c.vers)

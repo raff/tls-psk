@@ -410,7 +410,7 @@ func (ka pskKeyAgreement) generateServerKeyExchange(config *Config, cert *Certif
 
 func (ka pskKeyAgreement) processClientKeyExchange(config *Config, cert *Certificate, ckx *clientKeyExchangeMsg, version uint16) ([]byte, error) {
 
-        if config.GetKey == nil {
+	if config.GetKey == nil {
 		return nil, errors.New("bad Config - GetKey required for PSK")
 	}
 
@@ -454,7 +454,7 @@ func (ka pskKeyAgreement) generateClientKeyExchange(config *Config, clientHello 
 	if config.GetIdentity == nil {
 		return nil, nil, errors.New("bad Config - GetIdentity required for PSK")
 	}
-        if config.GetKey == nil {
+	if config.GetKey == nil {
 		return nil, nil, errors.New("bad Config - GetKey required for PSK")
 	}
 

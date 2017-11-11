@@ -5,13 +5,13 @@
 package psk
 
 import (
+	"crypto/x509"
 	"errors"
-        "crypto/x509"
-        "github.com/raff/tls-ext"
+	"github.com/raff/tls-ext"
 )
 
 func init() {
-    tls.RegisterCipherSuites(pskCipherSuites...)
+	tls.RegisterCipherSuites(pskCipherSuites...)
 }
 
 // The list of supported PSK cipher suites
@@ -20,9 +20,9 @@ var pskCipherSuites = []*tls.CipherSuite{
 	{TLS_PSK_WITH_3DES_EDE_CBC_SHA, 24, 20, 8, pskKA, tls.SuiteNoCerts, tls.Cipher3DES, tls.MacSHA1, nil},
 	{TLS_PSK_WITH_AES_128_CBC_SHA, 16, 20, 16, pskKA, tls.SuiteNoCerts, tls.CipherAES, tls.MacSHA1, nil},
 	{TLS_PSK_WITH_AES_256_CBC_SHA, 32, 20, 16, pskKA, tls.SuiteNoCerts, tls.CipherAES, tls.MacSHA1, nil},
-        }
+}
 
-// A list of the possible PSK cipher suite ids. 
+// A list of the possible PSK cipher suite ids.
 // Note that not all of them are supported.
 const (
 	TLS_PSK_WITH_RC4_128_SHA          uint16 = 0x008A
@@ -64,10 +64,10 @@ func (ka pskKeyAgreement) GenerateServerKeyExchange(config *tls.Config, cert *tl
 
 func (ka pskKeyAgreement) ProcessClientKeyExchange(config *tls.Config, cert *tls.Certificate, ckx *tls.ClientKeyExchangeMsg, version uint16) ([]byte, error) {
 
-        pskConfig, ok := config.Extra.(PSKConfig)
-        if !ok {
+	pskConfig, ok := config.Extra.(PSKConfig)
+	if !ok {
 		return nil, errors.New("bad Config - Extra not of type PSKConfig")
-        }
+	}
 
 	if pskConfig.GetKey == nil {
 		return nil, errors.New("bad Config - GetKey required for PSK")
@@ -110,10 +110,10 @@ func (ka pskKeyAgreement) ProcessServerKeyExchange(config *tls.Config, clientHel
 
 func (ka pskKeyAgreement) GenerateClientKeyExchange(config *tls.Config, clientHello *tls.ClientHelloMsg, cert *x509.Certificate) ([]byte, *tls.ClientKeyExchangeMsg, error) {
 
-        pskConfig, ok := config.Extra.(PSKConfig)
-        if !ok {
+	pskConfig, ok := config.Extra.(PSKConfig)
+	if !ok {
 		return nil, nil, errors.New("bad Config - Extra not of type PSKConfig")
-        }
+	}
 
 	if pskConfig.GetIdentity == nil {
 		return nil, nil, errors.New("bad PSKConfig - GetIdentity required for PSK")

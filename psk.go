@@ -78,13 +78,11 @@ func (ka pskKeyAgreement) ProcessClientKeyExchange(config *tls.Config, cert *tls
 	}
 
 	ciphertext := ckx.Ciphertext
-	if version != tls.VersionSSL30 {
-		ciphertextLen := int(ckx.Ciphertext[0])<<8 | int(ckx.Ciphertext[1])
-		if ciphertextLen != len(ckx.Ciphertext)-2 {
-			return nil, errors.New("bad ClientKeyExchange")
-		}
-		ciphertext = ckx.Ciphertext[2:]
+	ciphertextLen := int(ckx.Ciphertext[0])<<8 | int(ckx.Ciphertext[1])
+	if ciphertextLen != len(ckx.Ciphertext)-2 {
+		return nil, errors.New("bad ClientKeyExchange")
 	}
+	ciphertext = ckx.Ciphertext[2:]
 
 	// ciphertext is actually the pskIdentity here
 	psk, err := pskConfig.GetKey(string(ciphertext))

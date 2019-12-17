@@ -5,6 +5,9 @@ This package adds PSK cipher suites to the "standard" Go crypto/tls package.
 Well, since currently the standard crypto/tls package is not extensible, this package uses an "extensible" version
 (a copy of the standard crypto/tls package with some added functionalities)
 
+This version is compatible with crypto/tls from Go 1.2.2. If you need the newest version (based on Go 1.13.4) you
+can checkout the release/tag v01.0.0 (tls13 branch)
+
 Installatation
 ==============
 

@@ -7,6 +7,7 @@ package psk
 import (
 	"crypto/x509"
 	"errors"
+        "fmt"
 	"github.com/raff/tls-ext"
 )
 
@@ -16,16 +17,16 @@ func init() {
 
 // The list of supported PSK cipher suites
 var pskCipherSuites = []*tls.CipherSuite{
-	{TLS_PSK_WITH_RC4_128_SHA, 16, 20, 0, pskKA, tls.SuiteNoCerts, tls.CipherRC4, tls.MacSHA1, nil},
-	{TLS_PSK_WITH_3DES_EDE_CBC_SHA, 24, 20, 8, pskKA, tls.SuiteNoCerts, tls.Cipher3DES, tls.MacSHA1, nil},
-	{TLS_PSK_WITH_AES_128_CBC_SHA, 16, 20, 16, pskKA, tls.SuiteNoCerts, tls.CipherAES, tls.MacSHA1, nil},
-	{TLS_PSK_WITH_AES_256_CBC_SHA, 32, 20, 16, pskKA, tls.SuiteNoCerts, tls.CipherAES, tls.MacSHA1, nil},
+	//tls.NewCipherSuite(TLS_PSK_WITH_RC4_128_SHA, 16, 20, 0, pskKA, tls.SuiteNoCerts, tls.CipherRC4, tls.MacSHA1, nil),
+	tls.NewCipherSuite(TLS_PSK_WITH_3DES_EDE_CBC_SHA, 24, 20, 8, pskKA, tls.SuiteNoCerts, tls.Cipher3DES, tls.MacSHA1, nil),
+	tls.NewCipherSuite(TLS_PSK_WITH_AES_128_CBC_SHA, 16, 20, 16, pskKA, tls.SuiteNoCerts, tls.CipherAES, tls.MacSHA1, nil),
+	tls.NewCipherSuite(TLS_PSK_WITH_AES_256_CBC_SHA, 32, 20, 16, pskKA, tls.SuiteNoCerts, tls.CipherAES, tls.MacSHA1, nil),
 }
 
 // A list of the possible PSK cipher suite ids.
 // Note that not all of them are supported.
 const (
-	TLS_PSK_WITH_RC4_128_SHA          uint16 = 0x008A
+	//TLS_PSK_WITH_RC4_128_SHA          uint16 = 0x008A
 	TLS_PSK_WITH_3DES_EDE_CBC_SHA     uint16 = 0x008B
 	TLS_PSK_WITH_AES_128_CBC_SHA      uint16 = 0x008C
 	TLS_PSK_WITH_AES_256_CBC_SHA      uint16 = 0x008D
@@ -66,7 +67,7 @@ func (ka pskKeyAgreement) ProcessClientKeyExchange(config *tls.Config, cert *tls
 
 	pskConfig, ok := config.Extra.(PSKConfig)
 	if !ok {
-		return nil, errors.New("bad Config - Extra not of type PSKConfig")
+		return nil, fmt.Errorf("bad Config - Extra not of type PSKConfig: %#v", config.Extra)
 	}
 
 	if pskConfig.GetKey == nil {
@@ -112,7 +113,7 @@ func (ka pskKeyAgreement) GenerateClientKeyExchange(config *tls.Config, clientHe
 
 	pskConfig, ok := config.Extra.(PSKConfig)
 	if !ok {
-		return nil, nil, errors.New("bad Config - Extra not of type PSKConfig")
+		return nil, nil, fmt.Errorf("bad Config - Extra not of type PSKConfig: %#v", config.Extra)
 	}
 
 	if pskConfig.GetIdentity == nil {

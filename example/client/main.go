@@ -43,7 +43,7 @@ func main() {
 	log.Println("client: handshake: ", state.HandshakeComplete)
 	log.Println("client: mutual: ", state.NegotiatedProtocolIsMutual)
 
-	message := "Hello\n"
+	message := "Hello"
 	n, err := io.WriteString(conn, message)
 	if err != nil {
 		log.Fatalf("client: write: %s", err)

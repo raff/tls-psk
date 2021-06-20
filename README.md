@@ -10,7 +10,7 @@ This version is compatible with crypto/tls from Go 1.16.5. Refer release tags fo
 Installatation
 ==============
 
-    > go get github.com/bpatel85/tls-psk@1.16.5
+    > go get github.com/bpatel85/tls-psk
 
 Usage
 =====

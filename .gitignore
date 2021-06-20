@@ -22,4 +22,6 @@ _testmain.go
 *.exe
 .vscode
 .idea
+*.iml
+out
 

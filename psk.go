@@ -19,6 +19,17 @@ func init() {
 // The list of supported PSK cipher suites
 var pskCipherSuites = []*tlsext.CipherSuiteImpl{
 	{
+		Id:     TLS_PSK_WITH_RC4_128_SHA,
+		KeyLen: 16,
+		MacLen: 20,
+		IvLen:  0,
+		KA:     pskKA,
+		Flags:  tlsext.SuiteNoCerts,
+		Cipher: tlsext.CipherRC4,
+		Mac:    tlsext.MacSHA1,
+		Aead:   nil,
+	},
+	{
 		Id:     TLS_PSK_WITH_3DES_EDE_CBC_SHA,
 		KeyLen: 24,
 		MacLen: 20,
@@ -41,7 +52,7 @@ var pskCipherSuites = []*tlsext.CipherSuiteImpl{
 		Aead:   nil,
 	},
 	{
-		Id:     TLS_PSK_WITH_3DES_EDE_CBC_SHA,
+		Id:     TLS_PSK_WITH_AES_256_CBC_SHA,
 		KeyLen: 32,
 		MacLen: 20,
 		IvLen:  16,
@@ -56,7 +67,7 @@ var pskCipherSuites = []*tlsext.CipherSuiteImpl{
 // A list of the possible PSK cipher suite ids.
 // Note that not all of them are supported.
 const (
-	//TLS_PSK_WITH_RC4_128_SHA          uint16 = 0x008A
+	TLS_PSK_WITH_RC4_128_SHA          uint16 = 0x008A
 	TLS_PSK_WITH_3DES_EDE_CBC_SHA     uint16 = 0x008B
 	TLS_PSK_WITH_AES_128_CBC_SHA      uint16 = 0x008C
 	TLS_PSK_WITH_AES_256_CBC_SHA      uint16 = 0x008D

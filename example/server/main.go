@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/x509"
 	"fmt"
+	"io"
 	"log"
 	"net"
 
@@ -67,7 +68,7 @@ func handleClient(conn net.Conn) {
 		log.Print("server: conn: waiting")
 		n, err := conn.Read(buf)
 		if err != nil {
-			if err != nil {
+			if err != nil && err != io.EOF {
 				log.Printf("server: conn: failed to read: %s", err)
 			}
 			break

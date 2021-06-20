@@ -5,21 +5,20 @@ This package adds PSK cipher suites to the "standard" Go crypto/tls package.
 Well, since currently the standard crypto/tls package is not extensible, this package uses an "extensible" version
 (a copy of the standard crypto/tls package with some added functionalities)
 
-This version is compatible with crypto/tls from Go 1.2.2. If you need the newest version (based on Go 1.13.4) you
-can checkout the release/tag v01.0.0 (tls13 branch)
+This version is compatible with crypto/tls from Go 1.16.5. Refer release tags for other versions of this packages.
 
 Installatation
 ==============
 
-    > go get github.com/raff/tls-psk
+    > go get github.com/bpatel85/tls-psk@1.16.5
 
 Usage
 =====
 
     // import packages
     import (
-        "github.com/raff/tls-ext"
-        "github.com/raff/tls-psk"
+        "github.com/bpatel85/tls-ext"
+        "github.com/bpatel85/tls-psk"
     )
     
     // define GetKey and GetIdentity methods
@@ -40,6 +39,7 @@ Usage
         config := &tls.Config{
                 CipherSuites: []uint16{psk.TLS_PSK_WITH_AES_128_CBC_SHA},
                 Certificates: []tls.Certificate{tls.Certificate{}},
+                MaxVersion: tls.VersionTLS12,   // <<<<<<<<<< REQUIRED FOR NOW
                 Extra: psk.PSKConfig{
                     GetKey: getKey,
                     GetIdentity: getIdentity,

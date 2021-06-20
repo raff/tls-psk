@@ -22,8 +22,9 @@ const serverPort int = 5000
 
 func main() {
 	config := &tlsExt.Config{
-		CipherSuites: []uint16{psk.TLS_PSK_WITH_AES_128_CBC_SHA},
-		MaxVersion:   tlsExt.VersionTLS12, // REQUIRED FOR NOW
+		CipherSuites:             []uint16{psk.TLS_PSK_WITH_AES_128_CBC_SHA},
+		PreferServerCipherSuites: false,
+		MaxVersion:               tlsExt.VersionTLS12, // REQUIRED FOR NOW
 		Extra: psk.PSKConfig{
 			GetKey:      getKey,
 			GetIdentity: getIdentity,

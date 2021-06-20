@@ -12,10 +12,6 @@ import (
 	tlsext "github.com/bpatel85/tls-ext"
 )
 
-func init() {
-	tlsext.RegisterCipherSuites(pskCipherSuites...)
-}
-
 // The list of supported PSK cipher suites
 var pskCipherSuites = []*tlsext.CipherSuiteImpl{
 	{
@@ -62,6 +58,11 @@ var pskCipherSuites = []*tlsext.CipherSuiteImpl{
 		Mac:    tlsext.MacSHA1,
 		Aead:   nil,
 	},
+}
+
+func init() {
+	fmt.Printf("registering the cipher suits for psk")
+	tlsext.RegisterCipherSuites(pskCipherSuites...)
 }
 
 // A list of the possible PSK cipher suite ids.

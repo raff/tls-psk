@@ -61,7 +61,6 @@ var pskCipherSuites = []*tlsext.CipherSuiteImpl{
 }
 
 func init() {
-	fmt.Printf("registering the cipher suits for psk")
 	tlsext.RegisterCipherSuites(pskCipherSuites...)
 }
 

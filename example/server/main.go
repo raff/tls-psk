@@ -13,7 +13,7 @@ import (
 
 // define GetKey and GetIdentity methods
 func getIdentity() string {
-	return "clientId"
+	panic("Get identity should never be called for server")
 }
 
 func getKey(id string) ([]byte, error) {

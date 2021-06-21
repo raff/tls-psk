@@ -18,5 +18,10 @@ _cgo_gotypes.go
 _cgo_export.*
 
 _testmain.go
-
+.DS_store
 *.exe
+.vscode
+.idea
+*.iml
+out
+

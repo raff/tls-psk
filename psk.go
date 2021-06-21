@@ -7,19 +7,61 @@ package psk
 import (
 	"crypto/x509"
 	"errors"
-	"github.com/raff/tls-ext"
+	"fmt"
+
+	tlsext "github.com/bpatel85/tls-ext"
 )
 
-func init() {
-	tls.RegisterCipherSuites(pskCipherSuites...)
+// The list of supported PSK cipher suites
+var pskCipherSuites = []*tlsext.CipherSuiteImpl{
+	{
+		Id:     TLS_PSK_WITH_RC4_128_SHA,
+		KeyLen: 16,
+		MacLen: 20,
+		IvLen:  0,
+		KA:     pskKA,
+		Flags:  tlsext.SuiteNoCerts,
+		Cipher: tlsext.CipherRC4,
+		Mac:    tlsext.MacSHA1,
+		Aead:   nil,
+	},
+	{
+		Id:     TLS_PSK_WITH_3DES_EDE_CBC_SHA,
+		KeyLen: 24,
+		MacLen: 20,
+		IvLen:  8,
+		KA:     pskKA,
+		Flags:  tlsext.SuiteNoCerts,
+		Cipher: tlsext.Cipher3DES,
+		Mac:    tlsext.MacSHA1,
+		Aead:   nil,
+	},
+	{
+		Id:     TLS_PSK_WITH_AES_128_CBC_SHA,
+		KeyLen: 16,
+		MacLen: 20,
+		IvLen:  16,
+		KA:     pskKA,
+		Flags:  tlsext.SuiteNoCerts,
+		Cipher: tlsext.CipherAES,
+		Mac:    tlsext.MacSHA1,
+		Aead:   nil,
+	},
+	{
+		Id:     TLS_PSK_WITH_AES_256_CBC_SHA,
+		KeyLen: 32,
+		MacLen: 20,
+		IvLen:  16,
+		KA:     pskKA,
+		Flags:  tlsext.SuiteNoCerts,
+		Cipher: tlsext.CipherAES,
+		Mac:    tlsext.MacSHA1,
+		Aead:   nil,
+	},
 }
 
-// The list of supported PSK cipher suites
-var pskCipherSuites = []*tls.CipherSuite{
-	{TLS_PSK_WITH_RC4_128_SHA, 16, 20, 0, pskKA, tls.SuiteNoCerts, tls.CipherRC4, tls.MacSHA1, nil},
-	{TLS_PSK_WITH_3DES_EDE_CBC_SHA, 24, 20, 8, pskKA, tls.SuiteNoCerts, tls.Cipher3DES, tls.MacSHA1, nil},
-	{TLS_PSK_WITH_AES_128_CBC_SHA, 16, 20, 16, pskKA, tls.SuiteNoCerts, tls.CipherAES, tls.MacSHA1, nil},
-	{TLS_PSK_WITH_AES_256_CBC_SHA, 32, 20, 16, pskKA, tls.SuiteNoCerts, tls.CipherAES, tls.MacSHA1, nil},
+func init() {
+	tlsext.RegisterCipherSuites(pskCipherSuites...)
 }
 
 // A list of the possible PSK cipher suite ids.
@@ -49,7 +91,7 @@ type PSKConfig struct {
 	GetKey func(identity string) ([]byte, error)
 }
 
-func pskKA(version uint16) tls.KeyAgreement {
+func pskKA(version uint16) tlsext.KeyAgreement {
 	return pskKeyAgreement{}
 }
 
@@ -57,16 +99,15 @@ func pskKA(version uint16) tls.KeyAgreement {
 type pskKeyAgreement struct {
 }
 
-func (ka pskKeyAgreement) GenerateServerKeyExchange(config *tls.Config, cert *tls.Certificate, clientHello *tls.ClientHelloMsg, hello *tls.ServerHelloMsg) (*tls.ServerKeyExchangeMsg, error) {
+func (ka pskKeyAgreement) GenerateServerKeyExchange(config *tlsext.Config, cert *tlsext.Certificate, clientHello *tlsext.ClientHelloMsg, hello *tlsext.ServerHelloMsg) (*tlsext.ServerKeyExchangeMsg, error) {
 	// no server key exchange
 	return nil, nil
 }
 
-func (ka pskKeyAgreement) ProcessClientKeyExchange(config *tls.Config, cert *tls.Certificate, ckx *tls.ClientKeyExchangeMsg, version uint16) ([]byte, error) {
-
+func (ka pskKeyAgreement) ProcessClientKeyExchange(config *tlsext.Config, cert *tlsext.Certificate, ckx *tlsext.ClientKeyExchangeMsg, version uint16) ([]byte, error) {
 	pskConfig, ok := config.Extra.(PSKConfig)
 	if !ok {
-		return nil, errors.New("bad Config - Extra not of type PSKConfig")
+		return nil, fmt.Errorf("bad Config - Extra not of type PSKConfig: %#v", config.Extra)
 	}
 
 	if pskConfig.GetKey == nil {
@@ -78,7 +119,7 @@ func (ka pskKeyAgreement) ProcessClientKeyExchange(config *tls.Config, cert *tls
 	}
 
 	ciphertext := ckx.Ciphertext
-	if version != tls.VersionSSL30 {
+	if version != tlsext.VersionSSL30 {
 		ciphertextLen := int(ckx.Ciphertext[0])<<8 | int(ckx.Ciphertext[1])
 		if ciphertextLen != len(ckx.Ciphertext)-2 {
 			return nil, errors.New("bad ClientKeyExchange")
@@ -92,27 +133,27 @@ func (ka pskKeyAgreement) ProcessClientKeyExchange(config *tls.Config, cert *tls
 		return nil, err
 	}
 
-	lenpsk := len(psk)
+	pskLen := len(psk)
 
-	preMasterSecret := make([]byte, 2*lenpsk+4)
-	preMasterSecret[0] = byte(lenpsk >> 8)
-	preMasterSecret[1] = byte(lenpsk)
-	preMasterSecret[lenpsk+2] = preMasterSecret[0]
-	preMasterSecret[lenpsk+3] = preMasterSecret[1]
-	copy(preMasterSecret[lenpsk+4:], psk)
+	preMasterSecret := make([]byte, 2*pskLen+4)
+	preMasterSecret[0] = byte(pskLen >> 8)
+	preMasterSecret[1] = byte(pskLen)
+	preMasterSecret[pskLen+2] = preMasterSecret[0]
+	preMasterSecret[pskLen+3] = preMasterSecret[1]
+	copy(preMasterSecret[pskLen+4:], psk)
 
 	return preMasterSecret, nil
 }
 
-func (ka pskKeyAgreement) ProcessServerKeyExchange(config *tls.Config, clientHello *tls.ClientHelloMsg, serverHello *tls.ServerHelloMsg, cert *x509.Certificate, skx *tls.ServerKeyExchangeMsg) error {
+func (ka pskKeyAgreement) ProcessServerKeyExchange(config *tlsext.Config, clientHello *tlsext.ClientHelloMsg, serverHello *tlsext.ServerHelloMsg, cert *x509.Certificate, skx *tlsext.ServerKeyExchangeMsg) error {
 	return errors.New("unexpected ServerKeyExchange")
 }
 
-func (ka pskKeyAgreement) GenerateClientKeyExchange(config *tls.Config, clientHello *tls.ClientHelloMsg, cert *x509.Certificate) ([]byte, *tls.ClientKeyExchangeMsg, error) {
+func (ka pskKeyAgreement) GenerateClientKeyExchange(config *tlsext.Config, clientHello *tlsext.ClientHelloMsg, cert *x509.Certificate) ([]byte, *tlsext.ClientKeyExchangeMsg, error) {
 
 	pskConfig, ok := config.Extra.(PSKConfig)
 	if !ok {
-		return nil, nil, errors.New("bad Config - Extra not of type PSKConfig")
+		return nil, nil, fmt.Errorf("bad Config - Extra not of type PSKConfig: %#v", config.Extra)
 	}
 
 	if pskConfig.GetIdentity == nil {
@@ -129,22 +170,22 @@ func (ka pskKeyAgreement) GenerateClientKeyExchange(config *tls.Config, clientHe
 	}
 
 	psk := []byte(key)
-	lenpsk := len(psk)
+	pskLen := len(psk)
 
-	preMasterSecret := make([]byte, 2*lenpsk+4)
-	preMasterSecret[0] = byte(lenpsk >> 8)
-	preMasterSecret[1] = byte(lenpsk)
-	preMasterSecret[lenpsk+2] = preMasterSecret[0]
-	preMasterSecret[lenpsk+3] = preMasterSecret[1]
-	copy(preMasterSecret[lenpsk+4:], psk)
+	preMasterSecret := make([]byte, 2*pskLen+4)
+	preMasterSecret[0] = byte(pskLen >> 8)
+	preMasterSecret[1] = byte(pskLen)
+	preMasterSecret[pskLen+2] = preMasterSecret[0]
+	preMasterSecret[pskLen+3] = preMasterSecret[1]
+	copy(preMasterSecret[pskLen+4:], psk)
 
 	bIdentity := []byte(pskIdentity)
-	lenpski := len(bIdentity)
+	pskIdentityLen := len(bIdentity)
 
-	ckx := new(tls.ClientKeyExchangeMsg)
-	ckx.Ciphertext = make([]byte, lenpski+2)
-	ckx.Ciphertext[0] = byte(lenpski >> 8)
-	ckx.Ciphertext[1] = byte(lenpski)
+	ckx := new(tlsext.ClientKeyExchangeMsg)
+	ckx.Ciphertext = make([]byte, pskIdentityLen+2)
+	ckx.Ciphertext[0] = byte(pskIdentityLen >> 8)
+	ckx.Ciphertext[1] = byte(pskIdentityLen)
 	copy(ckx.Ciphertext[2:], bIdentity)
 
 	return preMasterSecret, ckx, nil

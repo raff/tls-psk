@@ -105,9 +105,9 @@ func (ka pskKeyAgreement) GenerateServerKeyExchange(config *tlsext.Config, cert 
 }
 
 func (ka pskKeyAgreement) ProcessClientKeyExchange(config *tlsext.Config, cert *tlsext.Certificate, ckx *tlsext.ClientKeyExchangeMsg, version uint16) ([]byte, error) {
-	pskConfig, ok := config.Extra.(PSKAuthProvider)
+	pskAuthProvider, ok := config.Extra.(PSKAuthProvider)
 	if !ok {
-		return nil, fmt.Errorf("bad Config - Extra not of type PSKConfig: %#v", config.Extra)
+		return nil, fmt.Errorf("bad Config - Extra not of type PSKAuthProvider: %#v", config.Extra)
 	}
 
 	if len(ckx.Ciphertext) < 2 {
@@ -124,7 +124,7 @@ func (ka pskKeyAgreement) ProcessClientKeyExchange(config *tlsext.Config, cert *
 	}
 
 	// ciphertext is actually the pskIdentity here
-	psk, err := pskConfig.GetKey(string(ciphertext))
+	psk, err := pskAuthProvider.GetKey(string(ciphertext))
 	if err != nil {
 		return nil, err
 	}
@@ -146,13 +146,13 @@ func (ka pskKeyAgreement) ProcessServerKeyExchange(config *tlsext.Config, client
 }
 
 func (ka pskKeyAgreement) GenerateClientKeyExchange(config *tlsext.Config, clientHello *tlsext.ClientHelloMsg, cert *x509.Certificate) ([]byte, *tlsext.ClientKeyExchangeMsg, error) {
-	pskConfig, ok := config.Extra.(PSKAuthProvider)
+	pskAuthProvider, ok := config.Extra.(PSKAuthProvider)
 	if !ok {
-		return nil, nil, fmt.Errorf("bad Config - Extra not of type PSKConfig: %#v", config.Extra)
+		return nil, nil, fmt.Errorf("bad Config - Extra not of type PSKAuthProvider: %#v", config.Extra)
 	}
 
-	pskIdentity := pskConfig.GetIdentity()
-	key, err := pskConfig.GetKey(pskIdentity)
+	pskIdentity := pskAuthProvider.GetIdentity()
+	key, err := pskAuthProvider.GetKey(pskIdentity)
 	if err != nil {
 		return nil, nil, err
 	}

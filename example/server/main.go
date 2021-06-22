@@ -50,7 +50,7 @@ func main() {
 			break
 		}
 		defer conn.Close()
-		log.Printf("server: accepted from %s", conn.RemoteAddr())
+		log.Printf("==========\nserver: accepted from %s", conn.RemoteAddr())
 		tlscon, ok := conn.(*tls.Conn)
 		if ok {
 			log.Print("ok=true")
@@ -70,8 +70,10 @@ func handleClient(conn net.Conn) {
 		log.Print("server: conn: waiting")
 		n, err := conn.Read(buf)
 		if err != nil {
-			if err != nil && err != io.EOF {
+			if err != io.EOF {
 				log.Printf("server: conn: failed to read: %s", err)
+			} else {
+				log.Printf("server: conn: read all the data")
 			}
 			break
 		}

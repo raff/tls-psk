@@ -82,13 +82,13 @@ const (
 )
 
 // Configuration for PSK cipher-suite. The client needs to provide a GetIdentity and GetKey functions to retrieve client id and pre-shared-key
-type PSKConfig struct {
+type PSKAuthProvider interface {
 	// client-only - returns the client identity
-	GetIdentity func() string
+	GetIdentity() string
 
 	// for server - returns the key associated to a client identity
 	// for client - returns the key for this client
-	GetKey func(identity string) ([]byte, error)
+	GetKey(identity string) ([]byte, error)
 }
 
 func pskKA(version uint16) tlsext.KeyAgreement {
@@ -105,13 +105,9 @@ func (ka pskKeyAgreement) GenerateServerKeyExchange(config *tlsext.Config, cert 
 }
 
 func (ka pskKeyAgreement) ProcessClientKeyExchange(config *tlsext.Config, cert *tlsext.Certificate, ckx *tlsext.ClientKeyExchangeMsg, version uint16) ([]byte, error) {
-	pskConfig, ok := config.Extra.(PSKConfig)
+	pskConfig, ok := config.Extra.(PSKAuthProvider)
 	if !ok {
 		return nil, fmt.Errorf("bad Config - Extra not of type PSKConfig: %#v", config.Extra)
-	}
-
-	if pskConfig.GetKey == nil {
-		return nil, errors.New("bad Config - GetKey required for PSK")
 	}
 
 	if len(ckx.Ciphertext) < 2 {
@@ -150,17 +146,9 @@ func (ka pskKeyAgreement) ProcessServerKeyExchange(config *tlsext.Config, client
 }
 
 func (ka pskKeyAgreement) GenerateClientKeyExchange(config *tlsext.Config, clientHello *tlsext.ClientHelloMsg, cert *x509.Certificate) ([]byte, *tlsext.ClientKeyExchangeMsg, error) {
-
-	pskConfig, ok := config.Extra.(PSKConfig)
+	pskConfig, ok := config.Extra.(PSKAuthProvider)
 	if !ok {
 		return nil, nil, fmt.Errorf("bad Config - Extra not of type PSKConfig: %#v", config.Extra)
-	}
-
-	if pskConfig.GetIdentity == nil {
-		return nil, nil, errors.New("bad PSKConfig - GetIdentity required for PSK")
-	}
-	if pskConfig.GetKey == nil {
-		return nil, nil, errors.New("bad PSKConfig - GetKey required for PSK")
 	}
 
 	pskIdentity := pskConfig.GetIdentity()

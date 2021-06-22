@@ -9,27 +9,28 @@ import (
 	psk "github.com/bpatel85/tls-psk"
 )
 
-// define GetKey and GetIdentity methods
-func getIdentity() string {
+const serverPort int = 5000
+
+type ClientAuthProvider struct {
+}
+
+// client-only - returns the client identity
+func (svr ClientAuthProvider) GetIdentity() string {
 	return "clientId"
 }
 
-func getKey(id string) ([]byte, error) {
+// for client - returns the key for this client
+func (svr ClientAuthProvider) GetKey(identity string) ([]byte, error) {
 	return []byte("secret"), nil
 }
-
-const serverPort int = 5000
 
 func main() {
 	config := &tlsExt.Config{
 		CipherSuites:             []uint16{psk.TLS_PSK_WITH_AES_128_CBC_SHA},
 		PreferServerCipherSuites: false,
 		MaxVersion:               tlsExt.VersionTLS12, // REQUIRED FOR NOW
-		Extra: psk.PSKConfig{
-			GetKey:      getKey,
-			GetIdentity: getIdentity,
-		},
-		InsecureSkipVerify: true,
+		Extra:                    ClientAuthProvider{},
+		InsecureSkipVerify:       true,
 	}
 
 	conn, err := tlsExt.Dial("tcp", fmt.Sprintf(":%d", serverPort), config)

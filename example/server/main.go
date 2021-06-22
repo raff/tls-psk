@@ -11,16 +11,21 @@ import (
 	psk "github.com/bpatel85/tls-psk"
 )
 
-// define GetKey and GetIdentity methods
-func getIdentity() string {
-	panic("Get identity should never be called for server")
+const serverPort int = 5000
+
+type ServerAuthProvider struct {
 }
 
-func getKey(id string) ([]byte, error) {
+// client-only - returns the client identity
+func (svr ServerAuthProvider) GetIdentity() string {
+	panic("this should never be called for server")
+}
+
+// for server - returns the key associated to a client identity
+// for client - returns the key for this client
+func (svr ServerAuthProvider) GetKey(identity string) ([]byte, error) {
 	return []byte("secret"), nil
 }
-
-const serverPort int = 5000
 
 func main() {
 	config := &tls.Config{
@@ -28,10 +33,7 @@ func main() {
 		PreferServerCipherSuites: false,
 		Certificates:             []tls.Certificate{{}}, // pass in empty configs
 		MaxVersion:               tls.VersionTLS12,      // REQUIRED FOR NOW
-		Extra: psk.PSKConfig{
-			GetKey:      getKey,
-			GetIdentity: getIdentity,
-		},
+		Extra:                    ServerAuthProvider{},
 	}
 
 	// start the server
@@ -48,7 +50,7 @@ func main() {
 			break
 		}
 		defer conn.Close()
-		log.Printf("server: accepted from %s", conn.RemoteAddr())
+		log.Printf("==========\nserver: accepted from %s", conn.RemoteAddr())
 		tlscon, ok := conn.(*tls.Conn)
 		if ok {
 			log.Print("ok=true")
@@ -68,8 +70,10 @@ func handleClient(conn net.Conn) {
 		log.Print("server: conn: waiting")
 		n, err := conn.Read(buf)
 		if err != nil {
-			if err != nil && err != io.EOF {
+			if err != io.EOF {
 				log.Printf("server: conn: failed to read: %s", err)
+			} else {
+				log.Printf("server: conn: read all the data")
 			}
 			break
 		}

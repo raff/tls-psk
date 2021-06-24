@@ -1,6 +1,7 @@
 from __future__ import print_function
 import socket
 import ssl
+import sys
 import sslpsk
 
 clientPsk = (b'secret', b'clientId')
@@ -16,11 +17,19 @@ def client(host, port):
 
     msg = "ping"
     ssl_sock.sendall(msg.encode())
-    msg = ssl_sock.recv(4).decode()
+    msg = ssl_sock.recv(400).decode()
     print('Client received: %s'%(msg))
 
     ssl_sock.shutdown(socket.SHUT_RDWR)
     ssl_sock.close()
+
+def _sslobj(sock):
+    if (3, 5) <= sys.version_info <= (3, 7):
+        return sock._sslobj._sslobj
+    else:
+        return sock._sslobj
+
+sslpsk.sslpsk._sslobj = _sslobj
 
 def main():
     host = '127.0.0.1'
